@@ -1,0 +1,7 @@
+-I.
+-I/usr/include
+-I/usr/X11R6/include
+-DVERSION="1.2a"
+-std=c99
+-pedantic
+-Wall

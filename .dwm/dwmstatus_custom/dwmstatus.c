@@ -96,7 +96,7 @@ static int battery_get_percent(battery_info_t bat) {
 
 static int fetch_wifi_info(char *wifi_str) {
   int len = 0;
-  status_t wifi = fread_wifi_status("/sys/class/net/wlp3s0/operstate");
+  status_t wifi = fread_wifi_status("/sys/class/net/wlp4s0/operstate");
 
   if(wifi == UP) {
     len += snprintf(wifi_str, STRSZ, "\ue220");
@@ -133,7 +133,7 @@ static int fetch_battery_info(char *bat_str) {
       len += snprintf(bat_str, STRSZ, "\ue238");
   }
 
-  len += snprintf(bat_str + len, STRSZ - len, "", bat_percent);
+  /* len += snprintf(bat_str + len, STRSZ - len, "", bat_percent); */
 
   return len;
 }
@@ -216,8 +216,6 @@ static void display_volume(char * volumestr, const int volume) {
 }
 
 int crop_volume_level(const char * output_line) {
-    char * volume_level = NULL;
-    char * start = NULL;
     char * end = NULL;
 
     end = strstr(output_line, "%");
@@ -226,7 +224,6 @@ int crop_volume_level(const char * output_line) {
     end -= 1;
     *end = 0x00;
 
-    int size = 0;
     while (*end != 'm') {
         end--;
     }
