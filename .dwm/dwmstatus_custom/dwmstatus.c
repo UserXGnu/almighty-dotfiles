@@ -96,7 +96,7 @@ static int battery_get_percent(battery_info_t bat) {
 
 static int fetch_wifi_info(char *wifi_str) {
   int len = 0;
-  status_t wifi = fread_wifi_status("/sys/class/net/wlp4s0/operstate");
+  status_t wifi = fread_wifi_status("/sys/class/net/wlp3s0/operstate");
 
   if(wifi == UP) {
     len += snprintf(wifi_str, STRSZ, "\ue220");
@@ -145,6 +145,8 @@ static int fetch_current_time(char *time_str) {
   return strftime(time_str, STRSZ, "%a %d, %b %H:%M %p \ue0a5 ", current_tm);
 }
 
+
+// VPN Status
 #include <net/if.h>
 static status_t fetch_vpn_status (void) {
     const char * vpn_ifaces[] = { "tap", "tun", NULL };
@@ -175,6 +177,93 @@ static void fetch_vpn_info (char * vpnstatus) {
     snprintf (vpnstatus, STRSZ, (fetch_vpn_status() == UP ? "\ue1c2" : "\ue1bc"));
 }
 
+#include <stdbool.h>
+
+#ifndef OUTPUT_SIZE
+#define OUTPUT_SIZE     1024
+#endif /* end of include guard: OUTPUT_SIZE */
+
+#ifndef PRINT_VOLUME
+#define PRINT_VOLUME(var,code)    snprintf((var), 32, "%s", (code));
+#endif /* end of include guard: PRINT_VOLUME */
+
+static void display_volume(char * volumestr, const int volume) {
+    if (volume == 0) {
+        PRINT_VOLUME(volumestr, "\ue04f");
+        return;
+    }
+    if (volume <= 25) {
+        PRINT_VOLUME(volumestr, "\ue0e3");
+        return;
+    }
+    if (volume <= 50) {
+        PRINT_VOLUME(volumestr, "\ue0e2");
+        return;
+    }
+    if (volume <= 75) {
+        PRINT_VOLUME(volumestr, "\ue0e1");
+        return;
+    }
+    if (volume <= 100) {
+        PRINT_VOLUME(volumestr, "\ue0e0");
+        return;
+    }
+    if (volume > 100) {
+        PRINT_VOLUME(volumestr, "\ue05d");
+        return;
+    }
+
+}
+
+int crop_volume_level(const char * output_line) {
+    char * volume_level = NULL;
+    char * start = NULL;
+    char * end = NULL;
+
+    end = strstr(output_line, "%");
+    if (!end)
+        return -1;
+    end -= 1;
+    *end = 0x00;
+
+    int size = 0;
+    while (*end != 'm') {
+        end--;
+    }
+    end++;
+    return atoi(end);
+}
+
+void fetch_volume_level(char * volume_status) {
+    bool pulseaudio_command;
+    const char * mixer_command = "/usr/bin/pulseaudio-ctl";
+    char command_output[OUTPUT_SIZE] = { 0 };
+    memset (command_output, 0x00, 1024);
+    FILE * fp;
+
+command_test:
+    if (pulseaudio_command != 0)
+        return;
+    fp = popen(mixer_command, "r");
+    if (!fp) {
+        fprintf (stderr, "Failed to run command [!!]");
+        pulseaudio_command = -1;
+        goto command_test;
+    }
+    char * output_line = NULL;
+    while(fgets (command_output, OUTPUT_SIZE, fp)) {
+        if ((output_line = strstr(command_output, "Volume level")) != NULL) {
+            output_line[strlen(output_line)-1] = 0x00;
+            /* printf ("%s\n", output_line); */
+            display_volume(volume_status, crop_volume_level(output_line));
+            return;
+        }
+    }
+
+    /* return crop_volume_level(command_output); */
+}
+
+
 int main(void) {
   static Display *dpy;
   char status[STATUSSZ];
@@ -182,6 +271,7 @@ int main(void) {
   char wifi[STRSZ];
   char time[STRSZ];
   char vpnstatus[STRSZ];
+  char volume_status[STRSZ];
 
   if (!(dpy = XOpenDisplay(NULL))) {
     fprintf(stderr, "dwmstatus: cannot open display.\n");
@@ -193,8 +283,9 @@ int main(void) {
     fetch_battery_info(battery);
     fetch_current_time(time);
     fetch_vpn_info (vpnstatus);
+    fetch_volume_level(volume_status);
 
-    snprintf(status, STATUSSZ, "%s %s %s %s", vpnstatus, wifi, battery, time);
+    snprintf(status, STATUSSZ, "%s %s %s %s %s", vpnstatus, wifi, battery, volume_status, time);
 
     XStoreName(dpy, DefaultRootWindow(dpy), status);
     XFlush(dpy);
